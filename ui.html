@@ -2,6 +2,8 @@
 <p>Count: <input id="count" value="5"></p>
 <button id="create">Create</button>
 <button id="cancel">Cancel</button>
+<button id="fetch-css">Fetch CSS</button>
+<p id="status">Unfetched</p>
 <script>
 
 document.getElementById('create').onclick = () => {
@@ -12,6 +14,16 @@ document.getElementById('create').onclick = () => {
 
 document.getElementById('cancel').onclick = () => {
   parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+}
+
+document.getElementById('fetch-css').onclick = () => {
+  console.log("item fetched. Forwarded.....")
+  let status = document.getElementById('status');
+  parent.postMessage({ pluginMessage: { type: 'fetch-css', value: 5 }}, '*');
+}
+
+onmessage = (event) => {
+  console.log("message: ", event.data.pluginMessage);
 }
 
 </script>

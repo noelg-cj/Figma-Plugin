@@ -25,7 +25,15 @@ figma.ui.onmessage = msg => {
         figma.currentPage.selection = nodes;
         figma.viewport.scrollAndZoomIntoView(nodes);
     }
+
+    else if (msg.type === 'fetch-css') {
+        console.log("Message recieved!");
+        console.log(msg.value);
+        figma.ui.postMessage("hi");
+    }
     // Make sure to close the plugin when you're done. Otherwise the plugin will
     // keep running, which shows the cancel button at the bottom of the screen.
-    figma.closePlugin();
+    //figma.closePlugin();
 };
+
+
