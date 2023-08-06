@@ -1,38 +1,45 @@
-"use strict";
-// This plugin will open a window to prompt the user to enter a number, and
-// it will then create that many rectangles on the screen.
-// This file holds the main code for plugins. Code in this file has access to
-// the *figma document* via the figma global object.
-// You can access browser APIs in the <script> tag inside "ui.html" which has a
-// full browser environment (See https://www.figma.com/plugin-docs/how-plugins-run).
-// This shows the HTML page in "ui.html".
-figma.showUI(__html__);
-// Calls to "parent.postMessage" from within the HTML page will trigger this
-// callback. The callback will be passed the "pluginMessage" property of the
-// posted message.
+//import { getNodes } from "./src/htmlProcessor";
+
+figma.showUI(__html__, { themeColors: true, } );
+
+async function getPixels(node, type) {
+    const newFills = []
+    for (const paint of node.fills) {
+      if (paint.type === 'IMAGE') {
+
+        const image = figma.getImageByHash(paint.imageHash)
+        const bytes = await image.getBytesAsync()
+
+        figma.showUI(__html__, { visible: false })
+        console.log(type);
+        figma.ui.postMessage({ data: bytes, mode: type })
+  
+        const newBytes = await new Promise((resolve, reject) => {
+          figma.ui.onmessage = value => resolve(value)
+        })
+  
+        const newPaint = JSON.parse(JSON.stringify(paint))
+        newPaint.imageHash = figma.createImage(newBytes).hash
+        newFills.push(newPaint)
+      }
+    }
+    node.fills = newFills
+  }
+
+
 figma.ui.onmessage = msg => {
-    // One way of distinguishing between different types of messages sent from
-    // your HTML page is to use an object with a "type" property like this.
-    if (msg.type === 'create-rectangles') {
-        const nodes = [];
-        for (let i = 0; i < msg.count; i++) {
-            const rect = figma.createRectangle();
-            rect.x = i * 150;
-            rect.fills = [{ type: 'SOLID', color: { r: 1, g: 0.5, b: 0 } }];
-            figma.currentPage.appendChild(rect);
-            nodes.push(rect);
-        }
-        figma.currentPage.selection = nodes;
-        figma.viewport.scrollAndZoomIntoView(nodes);
+    if (msg.type === 'invert') {
+        console.log("Message recieved!");
+        console.log(figma.currentPage.selection[0]);
+        figma.ui.postMessage("hi");
+        getPixels(figma.currentPage.selection[0], msg.type);
     }
 
-    else if (msg.type === 'fetch-css') {
-        console.log("Message recieved!");
-        console.log(msg.value);
-        figma.ui.postMessage("hi");
+    else if (msg.type === 'vignette') {
+        console.log("vig msg");
+        getPixels(figma.currentPage.selection[0], msg.type);
     }
-    // Make sure to close the plugin when you're done. Otherwise the plugin will
-    // keep running, which shows the cancel button at the bottom of the screen.
+
     //figma.closePlugin();
 };
 

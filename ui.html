@@ -1,29 +1,168 @@
-<h2>Rectangle Creator</h2>
-<p>Count: <input id="count" value="5"></p>
-<button id="create">Create</button>
-<button id="cancel">Cancel</button>
-<button id="fetch-css">Fetch CSS</button>
-<p id="status">Unfetched</p>
+<style>
+  * {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--figma-color-bg);
+    color: var(--figma-color-text);
+    font-family: Inter;
+    padding: 20px;
+  }
+
+  .nav {
+    margin-top: 20px;
+    display: flex;
+    border-bottom: 1px solid var(--figma-color-border);
+  }
+
+  .nav li {
+    font-weight: 500;
+    list-style: none;
+    padding: 10px;
+    color: var(--figma-color-text-disabled);
+  }
+
+  .nav li:hover {
+    cursor: pointer;
+  }
+
+  li.active {
+    color: var(--figma-color-text-brand);
+    border-bottom: 1px solid var(--figma-color-text-brand);
+  }
+
+  .container {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  pre {
+    margin-top: 10px;
+    background-color: black;
+    border-radius: 10px;
+  }
+
+  button {
+    background-color: var(--figma-color-bg-brand);
+    border-radius: 5px;
+    padding: 10px 15px;
+    color: white;
+    border: none;
+  }
+
+  button:hover {
+    background-color: var(--figma-color-bg-brand-hover);
+    cursor: pointer;
+  }
+</style>
+
+<h2>Apply filters</h2>
+
+<div class="container">
+    <button id="invert">Invert</button>
+    <button id="vignette">Grayscale</button>
+</div>
+
 <script>
 
-document.getElementById('create').onclick = () => {
-  const textbox = document.getElementById('count');
-  const count = parseInt(textbox.value, 10);
-  parent.postMessage({ pluginMessage: { type: 'create-rectangles', count } }, '*')
+function convertTo2DArray(imageArray, height, width) {
+  const resultArray = new Array(height).fill(0).map(() => new Array(width).fill(0));
+
+  for (let i = 0; i < height; i++) {
+    for (let j = 0; j < width; j++) {
+      const index = i * width + j;
+      resultArray[i][j] = imageArray[index];
+    }
+  }
+  console.log("returned");
+  return resultArray;
 }
 
-document.getElementById('cancel').onclick = () => {
-  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+
+function convertTo1DArray(arr2D) {
+    const height = arr2D.length;
+    const width = arr2D[0].length;
+    const resultArray = new Array(height * width);
+  
+    let index = 0;
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        resultArray[index] = arr2D[i][j];
+        index++;
+      }
+    }
+  
+    return resultArray;
 }
 
-document.getElementById('fetch-css').onclick = () => {
-  console.log("item fetched. Forwarded.....")
-  let status = document.getElementById('status');
-  parent.postMessage({ pluginMessage: { type: 'fetch-css', value: 5 }}, '*');
+
+async function encode(canvas, ctx, imageData) {
+  ctx.putImageData(imageData, 0, 0)
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(new Uint8Array(reader.result))
+      reader.onerror = () => reject(new Error('Could not read from blob'))
+      reader.readAsArrayBuffer(blob)
+    })
+  })
 }
 
-onmessage = (event) => {
-  console.log("message: ", event.data.pluginMessage);
+async function decode(canvas, ctx, bytes) {
+  const url = URL.createObjectURL(new Blob([bytes]))
+  const image = await new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject()
+    img.src = url
+  })
+  canvas.width = image.width
+  canvas.height = image.height
+  ctx.drawImage(image, 0, 0)
+  const imageData = ctx.getImageData(0, 0, image.width, image.height)
+  return imageData
 }
 
+window.onmessage = async (event) => {
+    const bytes = event.data.pluginMessage.data
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    const imageData = await decode(canvas, ctx, bytes)
+    let pixels = imageData.data
+
+    if (event.data.pluginMessage.mode === 'invert') {
+      console.log("invert");
+      for (let i = 0; i < pixels.length; i += 4) {
+        pixels[i + 0] = 255 - pixels[i + 0]
+        pixels[i + 1] = 255 - pixels[i + 1]
+        pixels[i + 2] = 255 - pixels[i + 2]
+      }
+    }
+
+    else if (event.data.pluginMessage.mode === 'vignette') {
+      for (let i = 0; i < pixels.length; i += 4) {
+        const avg = (pixels[i + 0] + pixels[i + 1] + pixels[i + 2])/3;
+        pixels[i + 0] = avg
+        pixels[i + 1] = avg
+        pixels[i + 2] = avg
+      }
+    }
+    const newBytes = await encode(canvas, ctx, imageData)
+    window.parent.postMessage({pluginMessage: newBytes}, '*')
+  }
+
+
+document.getElementById('invert').onclick = () => {
+  parent.postMessage({ pluginMessage: { type: 'invert' } }, '*')
+}
+document.getElementById('vignette').onclick = () => {
+  parent.postMessage({ pluginMessage: { type: 'vignette' }}, '*')
+}
 </script>
